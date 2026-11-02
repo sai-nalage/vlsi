@@ -1,0 +1,168 @@
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity fifo is
+    Port (
+        d     : in  STD_LOGIC_VECTOR(3 downto 0);
+        enq   : in  STD_LOGIC;
+        deq   : in  STD_LOGIC;
+        rst   : in  STD_LOGIC;
+        clk   : in  STD_LOGIC;
+        q     : out STD_LOGIC_VECTOR(3 downto 0);
+        full  : out STD_LOGIC;
+        empty : out STD_LOGIC
+    );
+end fifo;
+
+architecture Behavioral of fifo is
+
+    type memory_type is array (0 to 3) of
+        STD_LOGIC_VECTOR(3 downto 0);
+
+    signal memory : memory_type := (others => (others => '0'));
+
+    signal front : integer range 0 to 3 := 0;
+    signal rear  : integer range 0 to 3 := 0;
+    signal count : integer range 0 to 4 := 0;
+
+    signal q_reg : STD_LOGIC_VECTOR(3 downto 0) := "0000";
+
+begin
+
+    q     <= q_reg;
+    full  <= '1' when count = 4 else '0';
+    empty <= '1' when count = 0 else '0';
+
+    process(clk, rst)
+    begin
+        if rst = '1' then
+
+            front <= 0;
+            rear  <= 0;
+            count <= 0;
+            q_reg <= "0000";
+
+        elsif rising_edge(clk) then
+
+            -- Enqueue operation
+            if enq = '1' and count < 4 then
+
+                memory(rear) <= d;
+
+                if rear = 3 then
+                    rear <= 0;
+                else
+                    rear <= rear + 1;
+                end if;
+
+                count <= count + 1;
+
+            -- Dequeue operation
+            elsif deq = '1' and count > 0 then
+
+                q_reg <= memory(front);
+
+                if front = 3 then
+                    front <= 0;
+                else
+                    front <= front + 1;
+                end if;
+
+                count <= count - 1;
+
+            end if;
+
+        end if;
+    end process;
+
+end Behavioral;
+
+testbench
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+entity tb_fifo is
+end tb_fifo;
+
+architecture behavior of tb_fifo is
+
+    signal d     : STD_LOGIC_VECTOR(3 downto 0) := "0000";
+    signal enq   : STD_LOGIC := '0';
+    signal deq   : STD_LOGIC := '0';
+    signal rst   : STD_LOGIC := '0';
+    signal clk   : STD_LOGIC := '0';
+
+    signal q     : STD_LOGIC_VECTOR(3 downto 0);
+    signal full  : STD_LOGIC;
+    signal empty : STD_LOGIC;
+
+begin
+
+    -- Instantiate FIFO
+    uut: entity work.fifo
+        port map (
+            d     => d,
+            enq   => enq,
+            deq   => deq,
+            rst   => rst,
+            clk   => clk,
+            q     => q,
+            full  => full,
+            empty => empty
+        );
+
+    -- Clock generation: 20 ns period
+    clk_process: process
+    begin
+        clk <= '0';
+        wait for 10 ns;
+
+        clk <= '1';
+        wait for 10 ns;
+    end process;
+
+    -- Stimulus process
+    stim_process: process
+    begin
+
+        -- Reset FIFO
+        rst <= '1';
+        wait for 20 ns;
+
+        rst <= '0';
+        wait for 20 ns;
+
+        -- Enqueue first data: 1000
+        d <= "1000";
+        enq <= '1';
+        wait for 20 ns;
+
+        -- Enqueue second data: 1001
+        d <= "1001";
+        wait for 20 ns;
+
+        -- Enqueue third data: 1110
+        d <= "1110";
+        wait for 20 ns;
+
+        -- Enqueue fourth data: 1010
+        d <= "1010";
+        wait for 20 ns;
+
+        -- Stop enqueue
+        enq <= '0';
+        wait for 20 ns;
+
+        -- Start dequeue
+        deq <= '1';
+        wait for 80 ns;
+
+        -- Stop dequeue
+        deq <= '0';
+
+        wait;
+    end process;
+
+end behavior;
